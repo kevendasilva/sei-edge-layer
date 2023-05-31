@@ -1,5 +1,8 @@
-#define FAIL_LED_PIN D0
-#define SUCCESS_LED_PIN D1
+// Constants for ESP8266
+#if defined(ESP8266)
+  #define FAIL_LED_PIN D0
+  #define SUCCESS_LED_PIN D1
+#endif
 
 void setup() {
   // LEDs for signaling
@@ -8,6 +11,7 @@ void setup() {
 }
 
 void loop() {
+
 }
 
 void turnOnLED(unsigned short pin) { digitalWrite(pin, HIGH); }
