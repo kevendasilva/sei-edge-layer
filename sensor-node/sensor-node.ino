@@ -7,9 +7,12 @@
   #define SUCCESS_LED_PIN D1
 #endif
 
+#define CONFIG_FILE "/config.json"
+#define JSON_BUFFER_SIZE 1024
+
 // WiFi
-const char *ssidWifi;
-const char *passwordWifi;
+const char *ssidWiFi;
+const char *passwordWiFi;
 
 // MQTT Broker
 const char *mqttBroker;
@@ -34,16 +37,16 @@ void setup() {
   loadingSignal();
 
   if (!SPIFFS.begin()) {
-    Serial.println("Failed to mount file system");
+    Serial.println("Failed to mount file system.");
     return;
   }
 
   loadingSignal();
 
   if (!loadConfig()) {
-    Serial.println("Failed to load config");
+    Serial.println("Failed to load config.");
   } else {
-    Serial.println("Config loaded");
+    Serial.println("Config loaded.");
   }
 }
 
@@ -56,7 +59,7 @@ void turnOffLED(unsigned short pin) { digitalWrite(pin, LOW); }
 
 void loadingSignal() {
   int blinkCount = 3;
-  short delayInMilliseconds = 500;
+  short delayInMilliseconds = 300;
 
   while (blinkCount > 0) {
     turnOnLED(SUCCESS_LED_PIN); turnOnLED(FAIL_LED_PIN);
@@ -70,7 +73,7 @@ void loadingSignal() {
 
 // Function to load configuration data
 bool loadConfig() {
-  File configFile = SPIFFS.open("/config.json", "r");
+  File configFile = SPIFFS.open(CONFIG_FILE, "r");
   
   if (!configFile) {
     return false;
@@ -78,35 +81,32 @@ bool loadConfig() {
 
   size_t size = configFile.size();
 
-  if (size > 1024) {
-    Serial.println("Config file size is too large");
+  if (size > JSON_BUFFER_SIZE) {
+    Serial.println("Config file size is too large.");
     return false;
   }
 
-  std::unique_ptr<char[]> buf(new char[size]);
-
-  configFile.readBytes(buf.get(), size);
-
-  StaticJsonDocument<1024> jsonDocument;
-  auto error = deserializeJson(jsonDocument, buf.get());
-
+  StaticJsonDocument<JSON_BUFFER_SIZE> jsonDocument;
+  
+  DeserializationError error = deserializeJson(jsonDocument, configFile);
+  
   if (error) {
-    Serial.println("Failed to parse config file");
+    Serial.print("Failed to parse config file: ");
     Serial.println(error.c_str());
     return false;
   }
 
-  JsonObject json = jsonDocument.as<JsonObject>();
+  ssidWiFi = jsonDocument["wifi"]["ssid"];
+  passwordWiFi = jsonDocument["wifi"]["password"];
 
-  ssidWifi = json["wifi"]["ssid"].as<const char*>();
-  passwordWifi = json["wifi"]["password"].as<const char*>();
+  mqttBroker = jsonDocument["broker"]["address"];
+  mqttPort = jsonDocument["broker"]["port"];
+  mqttUsername = jsonDocument["broker"]["username"];
+  mqttPassword = jsonDocument["broker"]["password"];
 
-  mqttBroker = json["broker"]["address"].as<const char*>();
-  mqttPort = json["broker"]["port"].as<int>();
-  mqttUsername = json["broker"]["username"].as<const char*>();
-  mqttPassword = json["broker"]["password"].as<const char*>();
+  nodeID = jsonDocument["node_id"];
 
-  nodeID = json["node_id"].as<short>();;
+  configFile.close();
 
   return true;
 }
