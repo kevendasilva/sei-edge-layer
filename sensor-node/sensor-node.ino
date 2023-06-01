@@ -1,3 +1,7 @@
+#if defined(ESP8266)
+  #include <ESP8266WiFi.h>
+#endif
+
 #include <ArduinoJson.h>
 #include "FS.h"
 
@@ -48,9 +52,17 @@ void setup() {
   } else {
     Serial.println("Config loaded.");
   }
+
+  connectToWiFi();
 }
 
 void loop() {
+  if (WiFi.status() != WL_CONNECTED) {
+    connectToWiFi();
+    return;
+  }
+
+  turnOnLED(FAIL_LED_PIN);
 }
 
 void turnOnLED(unsigned short pin) { digitalWrite(pin, HIGH); }
@@ -109,4 +121,15 @@ bool loadConfig() {
   configFile.close();
 
   return true;
+}
+
+void connectToWiFi() {
+  WiFi.begin(ssidWiFi, passwordWiFi);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    loadingSignal();
+    Serial.println("Connecting to WiFi...");
+  }
+
+  Serial.println("Connected to the WiFi network.");
 }
