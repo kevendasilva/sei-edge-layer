@@ -12,8 +12,8 @@
 #if defined(ESP8266)
   #define BOARD_NAME "ESP8266"
 
-  #define FAIL_LED_PIN D1
-  #define SUCCESS_LED_PIN D0
+  #define FAIL_LED_PIN D8
+  #define SUCCESS_LED_PIN D7
 
   #define NODE_ID 1
 #endif
@@ -22,8 +22,8 @@
 #if defined(ESP32)
   #define BOARD_NAME "ESP32"
   
-  #define FAIL_LED_PIN 42
-  #define SUCCESS_LED_PIN 41
+  #define FAIL_LED_PIN 41
+  #define SUCCESS_LED_PIN 42
 
   #define NODE_ID 2
 #endif
