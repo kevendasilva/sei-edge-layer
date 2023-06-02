@@ -1,9 +1,14 @@
 #if defined(ESP8266)
   #include <ESP8266WiFi.h>
+  #include "FS.h"
+#endif
+
+#if defined(ESP32)
+  #include <SPIFFS.h>
+  #include <WiFi.h>
 #endif
 
 #include <ArduinoJson.h>
-#include "FS.h"
 #include <PubSubClient.h>
 
 // Constants for ESP8266
@@ -12,6 +17,14 @@
 
   #define FAIL_LED_PIN D0
   #define SUCCESS_LED_PIN D1
+#endif
+
+// Constans for ESP32
+#if defined(ESP32)
+  #define BOARD_NAME "ESP32"
+  
+  #define FAIL_LED_PIN 42
+  #define SUCCESS_LED_PIN 41
 #endif
 
 #define CONFIG_FILE "/config.json"
@@ -124,16 +137,28 @@ bool loadConfig() {
     return false;
   }
 
+  #if defined(ESP32)
+    // Read the file content into a buffer
+    std::unique_ptr<char[]> buf(new char[size]);
+    configFile.readBytes(buf.get(), size);
+  #endif
+
   StaticJsonDocument<JSON_BUFFER_SIZE> jsonDocument;
-  
-  DeserializationError error = deserializeJson(jsonDocument, configFile);
-  
+
+  #if defined(ESP8266)
+    DeserializationError error = deserializeJson(jsonDocument, configFile);
+  #endif
+
+  #if defined(ESP32)
+    DeserializationError error = deserializeJson(jsonDocument, buf.get());
+  #endif
+
   if (error) {
     Serial.print("Failed to parse config file: ");
     Serial.println(error.c_str());
     return false;
   }
-
+  
   ssidWiFi = jsonDocument["wifi"]["ssid"];
   passwordWiFi = jsonDocument["wifi"]["password"];
 
@@ -181,7 +206,7 @@ void callback(char *topic, byte *payload, unsigned int length) {
   Serial.println();
 }
 
-void connectToBroker() {  
+void connectToBroker() {
   client.setServer(mqttBroker, mqttPort);
   client.setCallback(callback);
 
@@ -202,7 +227,7 @@ void connectToBroker() {
   }
 }
 
-void connectToWiFi() {
+void connectToWiFi() {  
   WiFi.begin(ssidWiFi, passwordWiFi);
 
   while (WiFi.status() != WL_CONNECTED) {
