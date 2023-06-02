@@ -1,22 +1,21 @@
 #if defined(ESP8266)
   #include <ESP8266WiFi.h>
-  #include "FS.h"
 #endif
 
 #if defined(ESP32)
-  #include <SPIFFS.h>
   #include <WiFi.h>
 #endif
 
-#include <ArduinoJson.h>
 #include <PubSubClient.h>
 
 // Constants for ESP8266
 #if defined(ESP8266)
   #define BOARD_NAME "ESP8266"
 
-  #define FAIL_LED_PIN D0
-  #define SUCCESS_LED_PIN D1
+  #define FAIL_LED_PIN D1
+  #define SUCCESS_LED_PIN D0
+
+  #define NODE_ID 1
 #endif
 
 // Constans for ESP32
@@ -25,23 +24,19 @@
   
   #define FAIL_LED_PIN 42
   #define SUCCESS_LED_PIN 41
+
+  #define NODE_ID 2
 #endif
 
-#define CONFIG_FILE "/config.json"
-#define JSON_BUFFER_SIZE 1024
-
 // WiFi
-const char *ssidWiFi;
-const char *passwordWiFi;
+const char *ssidWiFi = "ParkingLAN";
+const char *passwordWiFi = "12345678";
 
 // MQTT Broker
-const char *mqttBroker;
-int mqttPort;
-const char *mqttUsername;
-const char *mqttPassword;
-
-// Node ID
-short nodeID;
+const char *mqttBroker = "10.0.0.100";
+int mqttPort = 1883;
+const char *mqttUsername = "user";
+const char *mqttPassword = "12345678";
 
 // Clients
 WiFiClient espClient;
@@ -56,25 +51,6 @@ void setup() {
   // LEDs for signaling
   pinMode(FAIL_LED_PIN, OUTPUT);
   pinMode(SUCCESS_LED_PIN, OUTPUT);
-  
-  Serial.println("");
-  delay(500);
-  Serial.println("Mounting FS...");
-
-  loadingSignal();
-
-  if (!SPIFFS.begin()) {
-    Serial.println("Failed to mount file system.");
-    return;
-  }
-
-  loadingSignal();
-
-  if (!loadConfig()) {
-    Serial.println("Failed to load config.");
-  } else {
-    Serial.println("Config loaded.");
-  }
 
   connectToWiFi();
   connectToBroker();
@@ -122,63 +98,11 @@ void loadingSignal() {
   }
 }
 
-// Function to load configuration data
-bool loadConfig() {
-  File configFile = SPIFFS.open(CONFIG_FILE, "r");
-  
-  if (!configFile) {
-    return false;
-  }
-
-  size_t size = configFile.size();
-
-  if (size > JSON_BUFFER_SIZE) {
-    Serial.println("Config file size is too large.");
-    return false;
-  }
-
-  #if defined(ESP32)
-    // Read the file content into a buffer
-    std::unique_ptr<char[]> buf(new char[size]);
-    configFile.readBytes(buf.get(), size);
-  #endif
-
-  StaticJsonDocument<JSON_BUFFER_SIZE> jsonDocument;
-
-  #if defined(ESP8266)
-    DeserializationError error = deserializeJson(jsonDocument, configFile);
-  #endif
-
-  #if defined(ESP32)
-    DeserializationError error = deserializeJson(jsonDocument, buf.get());
-  #endif
-
-  if (error) {
-    Serial.print("Failed to parse config file: ");
-    Serial.println(error.c_str());
-    return false;
-  }
-  
-  ssidWiFi = jsonDocument["wifi"]["ssid"];
-  passwordWiFi = jsonDocument["wifi"]["password"];
-
-  mqttBroker = jsonDocument["broker"]["address"];
-  mqttPort = jsonDocument["broker"]["port"];
-  mqttUsername = jsonDocument["broker"]["username"];
-  mqttPassword = jsonDocument["broker"]["password"];
-
-  nodeID = jsonDocument["node_id"];
-
-  configFile.close();
-
-  return true;
-}
-
 void subscribeTopics() {
   // Defining the topic to handle the barrier state
-  topicBarrierState = "barrier/" + String(nodeID) + "/state";
+  topicBarrierState = "barrier/" + String(NODE_ID) + "/state";
 
-  // Subscribe topic 'barrier/nodeID/state'
+  // Subscribe topic 'barrier/NODE_ID/state'
   client.subscribe(topicBarrierState.c_str());
 }
 
@@ -211,7 +135,7 @@ void connectToBroker() {
   client.setCallback(callback);
 
   while (!client.connected()) {    
-    String clientId = String(BOARD_NAME) + "-#" + String(nodeID);
+    String clientId = String(BOARD_NAME) + "-#" + String(NODE_ID);
 
     Serial.printf("The client %s connects to Mosquitto MQTT broker.\n", clientId.c_str());
 
