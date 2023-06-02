@@ -46,8 +46,6 @@ PubSubClient client(espClient);
 String topicBarrierState;
 
 void setup() {
-  Serial.begin(115200);
-  
   // LEDs for signaling
   pinMode(FAIL_LED_PIN, OUTPUT);
   pinMode(SUCCESS_LED_PIN, OUTPUT);
@@ -108,17 +106,11 @@ void subscribeTopics() {
 
 // Callback for new messages
 void callback(char *topic, byte *payload, unsigned int length) {
-  Serial.print("Message arrived in topic: ");
-  Serial.println(topic);
-  Serial.print("Message: ");
-
   String message = "";
 
   for (int i = 0; i < length; i++) {
     message += (char)payload[i];
   }
-
-  Serial.print(message);
 
   // Open barrier
   if (String(topic) == topicBarrierState) {
@@ -126,28 +118,18 @@ void callback(char *topic, byte *payload, unsigned int length) {
       openBarrier();
     }
   }
-
-  Serial.println();
 }
 
 void connectToBroker() {
   client.setServer(mqttBroker, mqttPort);
   client.setCallback(callback);
 
-  while (!client.connected()) {    
-    String clientId = String(BOARD_NAME) + "-#" + String(NODE_ID);
+  String clientId = String(BOARD_NAME) + "-#" + String(NODE_ID);
 
-    Serial.printf("The client %s connects to Mosquitto MQTT broker.\n", clientId.c_str());
+  while (!client.connected()) {
+    client.connect(clientId.c_str(), mqttUsername, mqttPassword);
 
-    if (client.connect(clientId.c_str(), mqttUsername, mqttPassword)) {
-      Serial.println("Connected to the Mosquitto MQTT broker.");
-    } else {
-      Serial.print("Failed with state ");
-      Serial.print(client.state());
-      Serial.println();
-
-      loadingSignal();
-    }
+    loadingSignal();
   }
 }
 
@@ -156,8 +138,5 @@ void connectToWiFi() {
 
   while (WiFi.status() != WL_CONNECTED) {
     loadingSignal();
-    Serial.println("Connecting to WiFi...");
   }
-
-  Serial.println("Connected to the WiFi network.");
 }
