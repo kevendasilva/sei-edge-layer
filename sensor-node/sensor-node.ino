@@ -61,6 +61,22 @@ String topicBarrierState;
 #define DISTANCE_LIMIT 100
 #define DISTANCE_LIMIT_MARGIN_ERROR 50
 
+// Opening the barrier for the vehicle to proceed
+void openBarrier();
+// Distance from vehicle in cm
+float getDistance();
+// Checking using distance and error threshold if a vehicle is nearby
+bool vehicleIsNear();
+void turnOnLED(unsigned short pin);
+void turnOffLED(unsigned short pin);
+// Loading signal using LEDs
+void loadingSignal();
+void subscribeTopics();
+// Callback for new messages
+void callback(char *topic, byte *payload, unsigned int length);
+void connectToBroker();
+void connectToWiFi();
+
 void setup() {
   // LEDs for signaling
   pinMode(FAIL_LED_PIN, OUTPUT);
@@ -103,7 +119,6 @@ void openBarrier() {
   turnOffLED(SUCCESS_LED_PIN);
 }
 
-// Distance from vehicle in cm
 float getDistance() {
   long duration;
 
@@ -122,7 +137,6 @@ float getDistance() {
   return distance;
 }
 
-// Checking using distance and error threshold if a vehicle is nearby
 bool vehicleIsNear() {
   float distance = getDistance();
 
@@ -160,7 +174,6 @@ void subscribeTopics() {
   client.subscribe(topicBarrierState.c_str());
 }
 
-// Callback for new messages
 void callback(char *topic, byte *payload, unsigned int length) {
   String message = "";
 
