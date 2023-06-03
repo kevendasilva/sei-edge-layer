@@ -16,6 +16,10 @@
   #define SUCCESS_LED_PIN D7
 
   #define NODE_ID 1
+
+  // Presence Sensor
+  #define TRIG_PIN D1
+  #define ECHO_PIN D0
 #endif
 
 // Constans for ESP32
@@ -26,6 +30,10 @@
   #define SUCCESS_LED_PIN 42
 
   #define NODE_ID 2
+  
+  // Presence Sensor
+  #define TRIG_PIN 19
+  #define ECHO_PIN 20
 #endif
 
 // WiFi
@@ -45,10 +53,22 @@ PubSubClient client(espClient);
 // Topic
 String topicBarrierState;
 
+// Define sound velocity in cm/uS
+#define SOUND_VELOCITY 0.034
+#define CM_TO_INCH 0.393701
+
+// Distance limit and Error in cm
+#define DISTANCE_LIMIT 100
+#define DISTANCE_LIMIT_MARGIN_ERROR 50
+
 void setup() {
   // LEDs for signaling
   pinMode(FAIL_LED_PIN, OUTPUT);
   pinMode(SUCCESS_LED_PIN, OUTPUT);
+
+  // Configuring Presence Sensor
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
 
   connectToWiFi();
   connectToBroker();
@@ -68,6 +88,11 @@ void loop() {
 
   turnOnLED(FAIL_LED_PIN);
 
+  if (vehicleIsNear()) {
+    turnOffLED(FAIL_LED_PIN);
+    delay(1000);
+  }
+  
   client.loop();
 }
 
@@ -76,6 +101,37 @@ void openBarrier() {
   turnOnLED(SUCCESS_LED_PIN);
   delay(3000);
   turnOffLED(SUCCESS_LED_PIN);
+}
+
+// Distance from vehicle in cm
+float getDistance() {
+  long duration;
+
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+
+  duration = pulseIn(ECHO_PIN, HIGH);
+
+  float distance;
+  // Calculate the distance
+  distance = duration * SOUND_VELOCITY / 2;
+
+  return distance;
+}
+
+// Checking using distance and error threshold if a vehicle is nearby
+bool vehicleIsNear() {
+  float distance = getDistance();
+
+  if (DISTANCE_LIMIT - DISTANCE_LIMIT_MARGIN_ERROR <= distance && 
+      distance <= DISTANCE_LIMIT + DISTANCE_LIMIT_MARGIN_ERROR) {
+    return true;
+  }
+
+  return false;
 }
 
 void turnOnLED(unsigned short pin) { digitalWrite(pin, HIGH); }
