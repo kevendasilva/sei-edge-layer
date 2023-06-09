@@ -1,10 +1,4 @@
-#if defined(ESP8266)
-  #include <ESP8266WiFi.h>
-#endif
-
-#if defined(ESP32)
-  #include <WiFi.h>
-#endif
+#include "WiFiSetup.h"
 
 #include <PubSubClient.h>
 
@@ -75,7 +69,6 @@ void subscribeTopics();
 // Callback for new messages
 void callback(char *topic, byte *payload, unsigned int length);
 void connectToBroker();
-void connectToWiFi();
 
 void setup() {
   // LEDs for signaling
@@ -86,7 +79,11 @@ void setup() {
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
 
-  connectToWiFi();
+  connectToWiFi(ssidWiFi, passwordWiFi);
+  while (!isConnectedToWiFi()) {
+    loadingSignal();
+  }
+
   connectToBroker();
 
   subscribeTopics();
@@ -94,7 +91,10 @@ void setup() {
 
 void loop() {
   if (WiFi.status() != WL_CONNECTED) {
-    connectToWiFi();
+    connectToWiFi(ssidWiFi, passwordWiFi);
+    while (!isConnectedToWiFi()) {
+      loadingSignal();
+    }
     return;
   }
 
@@ -198,14 +198,6 @@ void connectToBroker() {
   while (!client.connected()) {
     client.connect(clientId.c_str(), mqttUsername, mqttPassword);
 
-    loadingSignal();
-  }
-}
-
-void connectToWiFi() {  
-  WiFi.begin(ssidWiFi, passwordWiFi);
-
-  while (WiFi.status() != WL_CONNECTED) {
     loadingSignal();
   }
 }
