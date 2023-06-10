@@ -4,8 +4,6 @@
 
 // Constants for ESP8266
 #if defined(ESP8266)
-  #define BOARD_NAME "ESP8266"
-
   #define FAIL_LED_PIN D8
   #define SUCCESS_LED_PIN D7
 
@@ -18,13 +16,11 @@
 
 // Constans for ESP32
 #if defined(ESP32)
-  #define BOARD_NAME "ESP32"
-  
   #define FAIL_LED_PIN 41
   #define SUCCESS_LED_PIN 42
 
   #define NODE_ID 2
-  
+
   // Presence Sensor
   #define TRIG_PIN 19
   #define ECHO_PIN 20
@@ -35,17 +31,18 @@ const char *ssidWiFi = "ParkingLAN";
 const char *passwordWiFi = "12345678";
 
 // MQTT Broker
-const char *mqttBroker = "10.0.0.100";
-int mqttPort = 1883;
-const char *mqttUsername = "user";
-const char *mqttPassword = "12345678";
+const char *brokerAddress = "10.0.0.100";
+int brokerPort = 1883;
+const char *brokerUsername = "user";
+const char *brokerPassword = "12345678";
 
 // Clients
-WiFiClient espClient;
-PubSubClient client(espClient);
+WiFiClient wifiClient;
+PubSubClient client(wifiClient);
 
-// Topic
-String topicBarrierState;
+// Topics
+// Defining the topic to handle the barrier state
+String topicBarrierState = "barrier/" + String(NODE_ID) + "/state";
 
 // Define sound velocity in cm/uS
 #define SOUND_VELOCITY 0.034
@@ -108,7 +105,7 @@ void loop() {
     turnOffLED(FAIL_LED_PIN);
     delay(1000);
   }
-  
+
   client.loop();
 }
 
@@ -140,7 +137,7 @@ float getDistance() {
 bool vehicleIsNear() {
   float distance = getDistance();
 
-  if (DISTANCE_LIMIT - DISTANCE_LIMIT_MARGIN_ERROR <= distance && 
+  if (DISTANCE_LIMIT - DISTANCE_LIMIT_MARGIN_ERROR <= distance &&
       distance <= DISTANCE_LIMIT + DISTANCE_LIMIT_MARGIN_ERROR) {
     return true;
   }
@@ -160,43 +157,41 @@ void loadingSignal() {
     turnOnLED(SUCCESS_LED_PIN); turnOnLED(FAIL_LED_PIN);
     delay(delayInMilliseconds);
     turnOffLED(SUCCESS_LED_PIN); turnOffLED(FAIL_LED_PIN);
-    delay(delayInMilliseconds);    
+    delay(delayInMilliseconds);
 
     blinkCount--;
   }
 }
 
 void subscribeTopics() {
-  // Defining the topic to handle the barrier state
-  topicBarrierState = "barrier/" + String(NODE_ID) + "/state";
-
   // Subscribe topic 'barrier/NODE_ID/state'
   client.subscribe(topicBarrierState.c_str());
+}
+
+void barrierStateCallback(String message) {
+  if (message == "open")
+    openBarrier();
 }
 
 void callback(char *topic, byte *payload, unsigned int length) {
   String message = "";
 
-  for (int i = 0; i < length; i++) {
+  for (int i = 0; i < length; i++)
     message += (char)payload[i];
-  }
 
   // Open barrier
-  if (String(topic) == topicBarrierState) {
-    if (message == "open") {
-      openBarrier();
-    }
-  }
+  if (String(topic) == topicBarrierState)
+    barrierStateCallback(message);
 }
 
 void connectToBroker() {
-  client.setServer(mqttBroker, mqttPort);
+  client.setServer(brokerAddress, brokerPort);
   client.setCallback(callback);
 
-  String clientId = String(BOARD_NAME) + "-#" + String(NODE_ID);
+  const char *clientID = NODE_ID == 1 ? "ParkingEntry":"ParkingExit";
 
   while (!client.connected()) {
-    client.connect(clientId.c_str(), mqttUsername, mqttPassword);
+    client.connect(clientID, brokerUsername, brokerPassword);
 
     loadingSignal();
   }
