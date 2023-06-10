@@ -1,6 +1,7 @@
-#include "WiFiSetup.h"
-
 #include <PubSubClient.h>
+
+#include "Barrier.h"
+#include "WiFiSetup.h"
 
 // Constants for ESP8266
 #if defined(ESP8266)
@@ -44,45 +45,24 @@ PubSubClient client(wifiClient);
 // Defining the topic to handle the barrier state
 String topicBarrierState = "barrier/" + String(NODE_ID) + "/state";
 
-// Define sound velocity in cm/uS
-#define SOUND_VELOCITY 0.034
-#define CM_TO_INCH 0.393701
+// Barrier
+Barrier barrier(FAIL_LED_PIN, SUCCESS_LED_PIN, TRIG_PIN, ECHO_PIN);
 
-// Distance limit and Error in cm
-#define DISTANCE_LIMIT 100
-#define DISTANCE_LIMIT_MARGIN_ERROR 50
-
-// Opening the barrier for the vehicle to proceed
-void openBarrier();
-// Distance from vehicle in cm
-float getDistance();
-// Checking using distance and error threshold if a vehicle is nearby
-bool vehicleIsNear();
-void turnOnLED(unsigned short pin);
-void turnOffLED(unsigned short pin);
-// Loading signal using LEDs
-void loadingSignal();
 void subscribeTopics();
 // Callback for new messages
 void callback(char *topic, byte *payload, unsigned int length);
 void connectToBroker();
 
 void setup() {
-  // LEDs for signaling
-  pinMode(FAIL_LED_PIN, OUTPUT);
-  pinMode(SUCCESS_LED_PIN, OUTPUT);
-
-  // Configuring Presence Sensor
-  pinMode(TRIG_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT);
+  barrier.loadingSignal(3, 300);
+  barrier.setDistanceLimit(100, 50);
 
   connectToWiFi(ssidWiFi, passwordWiFi);
   while (!isConnectedToWiFi()) {
-    loadingSignal();
+    barrier.loadingSignal(3, 300);
   }
 
   connectToBroker();
-
   subscribeTopics();
 }
 
@@ -90,7 +70,7 @@ void loop() {
   if (WiFi.status() != WL_CONNECTED) {
     connectToWiFi(ssidWiFi, passwordWiFi);
     while (!isConnectedToWiFi()) {
-      loadingSignal();
+      barrier.loadingSignal(3, 300);
     }
     return;
   }
@@ -99,68 +79,13 @@ void loop() {
     ESP.restart();
   }
 
-  turnOnLED(FAIL_LED_PIN);
+  barrier.waitingSignal(1, 100);
 
-  if (vehicleIsNear()) {
-    turnOffLED(FAIL_LED_PIN);
-    delay(1000);
+  if (barrier.vehicleIsNear()) {
+    delay(5000);
   }
 
   client.loop();
-}
-
-void openBarrier() {
-  turnOffLED(FAIL_LED_PIN);
-  turnOnLED(SUCCESS_LED_PIN);
-  delay(3000);
-  turnOffLED(SUCCESS_LED_PIN);
-}
-
-float getDistance() {
-  long duration;
-
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
-
-  duration = pulseIn(ECHO_PIN, HIGH);
-
-  float distance;
-  // Calculate the distance
-  distance = duration * SOUND_VELOCITY / 2;
-
-  return distance;
-}
-
-bool vehicleIsNear() {
-  float distance = getDistance();
-
-  if (DISTANCE_LIMIT - DISTANCE_LIMIT_MARGIN_ERROR <= distance &&
-      distance <= DISTANCE_LIMIT + DISTANCE_LIMIT_MARGIN_ERROR) {
-    return true;
-  }
-
-  return false;
-}
-
-void turnOnLED(unsigned short pin) { digitalWrite(pin, HIGH); }
-
-void turnOffLED(unsigned short pin) { digitalWrite(pin, LOW); }
-
-void loadingSignal() {
-  int blinkCount = 3;
-  short delayInMilliseconds = 300;
-
-  while (blinkCount > 0) {
-    turnOnLED(SUCCESS_LED_PIN); turnOnLED(FAIL_LED_PIN);
-    delay(delayInMilliseconds);
-    turnOffLED(SUCCESS_LED_PIN); turnOffLED(FAIL_LED_PIN);
-    delay(delayInMilliseconds);
-
-    blinkCount--;
-  }
 }
 
 void subscribeTopics() {
@@ -170,7 +95,7 @@ void subscribeTopics() {
 
 void barrierStateCallback(String message) {
   if (message == "open")
-    openBarrier();
+    barrier.open();
 }
 
 void callback(char *topic, byte *payload, unsigned int length) {
@@ -193,6 +118,6 @@ void connectToBroker() {
   while (!client.connected()) {
     client.connect(clientID, brokerUsername, brokerPassword);
 
-    loadingSignal();
+    barrier.loadingSignal(3, 300);
   }
 }
