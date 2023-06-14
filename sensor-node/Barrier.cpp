@@ -4,7 +4,11 @@
 // Define sound velocity in cm/uS
 #define SOUND_VELOCITY 0.034
 
-Barrier::Barrier(int ledFailPin, int ledSuccessPin, int trigSensorPin, int echoSensorPin) {
+// Positions actuator
+#define INITIAL_POSITION 25
+#define FINAL_POSITION 195
+
+Barrier::Barrier(int ledFailPin, int ledSuccessPin, int trigSensorPin, int echoSensorPin, int actuatorPin) {
   pinMode(ledFailPin, OUTPUT);
   pinMode(ledSuccessPin, OUTPUT);
   pinMode(trigSensorPin, OUTPUT);
@@ -14,6 +18,8 @@ Barrier::Barrier(int ledFailPin, int ledSuccessPin, int trigSensorPin, int echoS
   this->ledSuccessPin = ledSuccessPin;
   this->trigSensorPin = trigSensorPin;
   this->echoSensorPin = echoSensorPin;
+
+  actuator.attach(actuatorPin);
 }
 
 float Barrier::getDistance() {
@@ -34,6 +40,21 @@ float Barrier::getDistance() {
   return distance;
 }
 
+void Barrier::close() {
+  turnOffLED(ledSuccessPin);
+  actuator.write(INITIAL_POSITION);
+}
+
+void Barrier::errorSignal(short blinkCount, short delayInMilliseconds) {
+  while (blinkCount > 0) {
+    turnOnLED(ledFailPin);
+    delay(delayInMilliseconds);
+    turnOffLED(ledFailPin);
+    delay(delayInMilliseconds);
+
+    blinkCount--;
+  } 
+}
 
 void Barrier::loadingSignal(short blinkCount, short delayInMilliseconds) {
   while (blinkCount > 0) {
@@ -48,8 +69,7 @@ void Barrier::loadingSignal(short blinkCount, short delayInMilliseconds) {
 
 void Barrier::open() {
   turnOnLED(ledSuccessPin);
-  delay(3000);
-  turnOffLED(ledSuccessPin);
+  actuator.write(FINAL_POSITION);
 }
 
 void Barrier::setDistanceLimit(int distanceLimit, int distanceLimitMarginError) {

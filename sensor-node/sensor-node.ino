@@ -13,6 +13,8 @@
   // Presence Sensor
   #define TRIG_PIN D1
   #define ECHO_PIN D0
+
+  #define ACTUATOR_PIN D2
 #endif
 
 // Constans for ESP32
@@ -25,6 +27,8 @@
   // Presence Sensor
   #define TRIG_PIN 19
   #define ECHO_PIN 20
+
+  #define ACTUATOR_PIN 45
 #endif
 
 // WiFi
@@ -46,7 +50,7 @@ PubSubClient client(wifiClient);
 String topicBarrierState = "barrier/" + String(NODE_ID) + "/state";
 
 // Barrier
-Barrier barrier(FAIL_LED_PIN, SUCCESS_LED_PIN, TRIG_PIN, ECHO_PIN);
+Barrier barrier(FAIL_LED_PIN, SUCCESS_LED_PIN, TRIG_PIN, ECHO_PIN, ACTUATOR_PIN);
 
 void subscribeTopics();
 // Callback for new messages
@@ -56,6 +60,7 @@ void connectToBroker();
 void setup() {
   barrier.loadingSignal(3, 300);
   barrier.setDistanceLimit(100, 50);
+  barrier.close();
 
   connectToWiFi(ssidWiFi, passwordWiFi);
   while (!isConnectedToWiFi()) {
@@ -79,10 +84,9 @@ void loop() {
     ESP.restart();
   }
 
-  barrier.waitingSignal(1, 100);
-
   if (barrier.vehicleIsNear()) {
-    delay(5000);
+    barrier.waitingSignal(1, 100);
+    delay(100);
   }
 
   client.loop();
@@ -94,8 +98,15 @@ void subscribeTopics() {
 }
 
 void barrierStateCallback(String message) {
-  if (message == "open")
-    barrier.open();
+  if (message != "open")
+    return;
+
+  barrier.open();
+  while (barrier.vehicleIsNear()) {
+    delay(500);
+  }
+  delay(6000);
+  barrier.close();
 }
 
 void callback(char *topic, byte *payload, unsigned int length) {
