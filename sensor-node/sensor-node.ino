@@ -49,6 +49,11 @@ PubSubClient client(wifiClient);
 // Defining the topic to handle the barrier state
 String topicBarrierState = "barrier/" + String(NODE_ID) + "/state";
 
+// Virtual Camera
+String topicCameraImage = "camera/" + String(NODE_ID);
+#define LIMIT_TIME 12000
+bool receivedResponse = false;
+
 // Barrier
 Barrier barrier(FAIL_LED_PIN, SUCCESS_LED_PIN, TRIG_PIN, ECHO_PIN, ACTUATOR_PIN);
 
@@ -85,11 +90,23 @@ void loop() {
   }
 
   if (barrier.vehicleIsNear()) {
-    barrier.waitingSignal(1, 100);
-    delay(100);
+    client.publish(topicCameraImage.c_str(), "image");
+
+    waitForResponse();
+    receivedResponse = false;
   }
 
   client.loop();
+}
+
+void waitForResponse() {
+  long startTime = millis();
+
+  while (millis() - startTime < LIMIT_TIME && !receivedResponse) {
+    barrier.waitingSignal(3, 100);
+
+    client.loop();
+  }
 }
 
 void subscribeTopics() {
@@ -98,15 +115,20 @@ void subscribeTopics() {
 }
 
 void barrierStateCallback(String message) {
-  if (message != "open")
-    return;
-
-  barrier.open();
-  while (barrier.vehicleIsNear()) {
-    delay(500);
+  if (message == "open") {
+    barrier.open();
+    while (barrier.vehicleIsNear()) {
+      delay(500);
+    }
+    delay(6000);
+    barrier.close();
   }
-  delay(6000);
-  barrier.close();
+
+  if (message == "error") {
+    barrier.errorSignal(3, 100);
+  }
+
+  receivedResponse = true;
 }
 
 void callback(char *topic, byte *payload, unsigned int length) {
